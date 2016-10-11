@@ -41,12 +41,12 @@ resources:
     type: OS::Neutron::FloatingIP
     properties:
       floating_network_id: { get_param: public_network }
-      port_id: { get_resource: serverY_port }
+      port_id: { get_resource: cb_cluster_data_port }
 
 outputs:
   cb_cluster_data_private_ip:
     description: Private IP address of couchbase data instance
-    value: { get_attr: [serverY, first_address ] }
+    value: { get_attr: [cb_cluster_data_instance, first_address ] }
   cb_cluster_data_floating_ip:
     description: Floating IP address of couchbase data instance
     value: {get_attr: [cb_cluster_data_floating_ip, floating_ip_address]}

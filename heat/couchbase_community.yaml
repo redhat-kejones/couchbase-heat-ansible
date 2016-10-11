@@ -58,7 +58,7 @@ resources:
          type: RH::Server::Couchbase
          properties:
            key_name: { get_param: key_name }
-           image: { get_param: image_name }
+           image_name: { get_param: image_name }
            flavor: { get_param: flavor }
            public_network: { get_param: private_network }
            private_network: { get_param: private_network }
