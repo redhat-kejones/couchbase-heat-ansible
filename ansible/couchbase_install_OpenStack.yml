@@ -1,0 +1,18 @@
+---
+# Install Couchbase cluster
+- name: Couchbase Installation
+  hosts: all
+  user: cloud-user
+  become: true
+  tasks:
+  - name: Copy couchbase rpm to server
+    copy:
+       src: ./couchbase-server-community-4.1.0-centos7.x86_64.rpm
+       dest: /tmp/couchbase-server-community-4.1.0-centos7.x86_64.rpm
+  - name: Install couchbase rpm
+    yum:
+       name: /tmp/couchbase-server-community-4.1.0-centos7.x86_64.rpm
+       state: present
+  - name: Ensure couchbase-server.service is started
+    service: name=couchbase-server.service state=started
+

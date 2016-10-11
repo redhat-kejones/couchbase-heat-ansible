@@ -1,0 +1,52 @@
+heat_template_version: 2013-05-23
+
+parameters:
+  key_name:
+    type: string
+    default: my_key
+  public_network:
+    type: string
+    default: external
+  private_network:
+    type: string
+    default: tenant
+  image_name:
+    type: string
+    default: rhel72
+  flavor:
+    type: string
+    default: m1.small
+
+resources:
+  cb_cluster_data_instance:
+    type: OS::Nova::Server
+    properties:
+      name: couchbase-data-instance
+      image: { get_param: image_name }
+      flavor: { get_param: flavor }
+      key_name: { get_param: key_name }
+      networks:
+        - port: { get_resource: cb_cluster_data_port }
+      user_data_format: RAW
+      user_data: |
+          #!/bin/bash -ex
+          echo "Hello from Couchbase Data Instance Updated" > /tmp/server_hello
+
+  cb_cluster_data_port:
+    type: OS::Neutron::Port
+    properties:
+      network_id: { get_param: private_network }
+
+  cb_cluster_data_floating_ip:
+    type: OS::Neutron::FloatingIP
+    properties:
+      floating_network_id: { get_param: public_network }
+      port_id: { get_resource: serverY_port }
+
+outputs:
+  cb_cluster_data_private_ip:
+    description: Private IP address of couchbase data instance
+    value: { get_attr: [serverY, first_address ] }
+  cb_cluster_data_floating_ip:
+    description: Floating IP address of couchbase data instance
+    value: {get_attr: [cb_cluster_data_floating_ip, floating_ip_address]}

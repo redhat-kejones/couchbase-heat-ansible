@@ -1,0 +1,21 @@
+---
+# Config Couchbase nodes
+- name: Config couchbase nodes
+  hosts: all
+  user: cloud-user
+  become: true
+  tasks:
+  - name: Create shell script for configuring main node
+    action: template src=couchbase-add-single-node.j2 dest=/tmp/add-single-node.sh mode=750
+
+  # Wait for main node to init
+#  - pause: seconds=30
+  - name: Launch config script
+    action: shell /tmp/add-single-node.sh
+#
+  # Wait for added node to configure
+#  - pause: seconds=30
+#
+  - name: Rebalance the cluster
+    shell: /opt/couchbase/bin/couchbase-cli rebalance -c {{ cluster_main_ip }}:8091 -u {{ admin_user }} -p {{ admin_password }}
+    

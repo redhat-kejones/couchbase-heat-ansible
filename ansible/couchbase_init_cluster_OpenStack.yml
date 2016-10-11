@@ -1,0 +1,9 @@
+---
+# Init Couchbase cluster
+- name: Couchbase cluster-init
+  hosts: all
+  user: cloud-user
+  become: true
+  tasks:
+   - name: Configure main node
+     shell: /opt/couchbase/bin/couchbase-cli cluster-init -c {{ cluster_main_ip }}:8091 --cluster-username={{ admin_user}} --cluster-password={{ admin_password }} --cluster-port=8091 --cluster-ramsize={{ cluster_ram_quota }} --services=query,data,index
