@@ -82,13 +82,6 @@ def get_stack_outputs(stack, search):
     dump_out = json.dumps(output)
     parsed_json = json.loads(dump_out)
     if search in (parsed_json['output_key']):
-      #print (parsed_json['output_key'])
-      #key_string = parsed_json['output_key']
-      #key_string = key_string.replace("Couchbase", "")
-      #key_string = key_string.replace("_Floating_IP", "")
-      # print "key_string = %s" % key_string
-      #position = int(key_string) - 1
-      #couchbase_floating_ips[position] = parsed_json['output_value']
       outputList.append(parsed_json['output_value'])
 
   return outputList
@@ -159,6 +152,8 @@ def main(argv):
                                      template=read_template,
                                      environment=read_env,
                                      parameters={
+                                       'flavor':flavor,
+                                       'image_name':imageName,
                                        'key_name':keyName,
                                        'public_network':publicNetwork,
                                        'private_network':privateNetwork,
@@ -187,25 +182,32 @@ def main(argv):
   stack_get = heatclient.stacks.get(stackName)
 
   masterIpList = get_stack_outputs(stack_get, "cb_cluster_main_floating_ip")
-  dataNodeIpList = get_stack_outputs(stack_get, "cb_cluster_data_group_ips")
-  print masterIpList
-  print dataNodeIpList
-  exit()
+  dataNodeFloatingIpList = get_stack_outputs(stack_get, "cb_cluster_data_group_floating_ips")
+  dataNodePrivateIpList = get_stack_outputs(stack_get, "cb_cluster_data_group_private_ips")
+
+  #Going to combine these lists for now. Will add ansible through proxy later
+  #and will switch to using private IPs for data nodes
+  couchbase_floating_ips = masterIpList
+  for x in dataNodeFloatingIpList:
+    couchbase_floating_ips.append(x[0])
+
+  couchbase_private_ips = []
+  for x in dataNodePrivateIpList:
+    couchbase_private_ips.append(x[0])
+
+  print couchbase_floating_ips
  
   print "Waiting for instances to become available - checking for password-less ssh access"
 
   for x in couchbase_floating_ips:
       check_server_available(x, 'cloud-user', '/home/kejones/kdj.pem', 'hostname')
 
-  print "Wait 30 seconds for all instances to become ready before playbook run"
-  time.sleep(30)
-
   # initialize needed objects
   variable_manager = VariableManager()
   loader = DataLoader()
 
   inventory = Inventory(loader=loader, variable_manager=variable_manager, host_list=couchbase_floating_ips)
-  playbook_path = '/home/kejones/heat/couchbase/couchbase_install_OpenStack.yml'
+  playbook_path = 'ansible/couchbase_install_OpenStack.yml'
 
   if not os.path.exists(playbook_path):
     print '[INFO] The playbook does not exist'
@@ -230,19 +232,19 @@ def main(argv):
   variable_manager2 = VariableManager()
   loader2 = DataLoader()
 
-  playbook_path2 = '/home/kejones/heat/couchbase/couchbase_init_cluster_OpenStack.yml'
+  playbook_path2 = 'ansible/couchbase_init_cluster_OpenStack.yml'
 
   if not os.path.exists(playbook_path2):
     print '[INFO] The playbook does not exist'
     sys.exit()
 
-  variable_manager2.extra_vars = {'cluster_main_ip' : couchbase_floating_ips[0],
+  variable_manager2.extra_vars = {'cluster_main_ip' : masterIpList[0],
                                 'admin_user' : 'Administrator',
                                 'admin_password' : 'Vinson#12',
                                 'cluster_ram_quota' : '2048' 
                                 }
 
-  inventory2 = Inventory(loader=loader2, variable_manager=variable_manager2, host_list=[couchbase_floating_ips[0]])
+  inventory2 = Inventory(loader=loader2, variable_manager=variable_manager2, host_list=[masterIpList[0]])
   pbex2 = PlaybookExecutor(playbooks=[playbook_path2], inventory=inventory2, variable_manager=variable_manager2, loader=loader2, options=options, passwords=passwords)
 
   results = pbex2.run()
@@ -253,13 +255,13 @@ def main(argv):
   variable_manager3 = VariableManager()
   loader3 = DataLoader()
 
-  playbook_path3 = '/home/kejones/heat/couchbase/couchbase_config_cluster_OpenStack.yml'
+  playbook_path3 = 'ansible/couchbase_config_cluster_OpenStack.yml'
 
   if not os.path.exists(playbook_path3):
     print '[INFO] The playbook does not exist'
     sys.exit()
 
-  variable_manager3.extra_vars = {'cluster_main_ip' : couchbase_floating_ips[0],
+  variable_manager3.extra_vars = {'cluster_main_ip' : masterIpList[0],
                                 'cluster_node_ips' : [couchbase_private_ips[1]],
                                 'admin_user' : 'Administrator',
                                 'admin_password' : 'Vinson#12',
@@ -270,7 +272,7 @@ def main(argv):
                                 'num_replicas' : '2'
                                 }
 
-  inventory3 = Inventory(loader=loader3, variable_manager=variable_manager3, host_list=[couchbase_floating_ips[0]])
+  inventory3 = Inventory(loader=loader3, variable_manager=variable_manager3, host_list=[masterIpList[0]])
   pbex3 = PlaybookExecutor(playbooks=[playbook_path3], inventory=inventory3, variable_manager=variable_manager3, loader=loader3, options=options, passwords=passwords)
 
   results = pbex3.run()
@@ -281,7 +283,7 @@ def main(argv):
 
   print "Message from Couchbase Configuration ..."
   print "  Couchbase Stack completed in: %d:%02d:%02d" % (h, m, s)
-  print "  Couchbase console can be accessed at %s:8091\n\n" % couchbase_floating_ips[0]
+  print "  Couchbase console can be accessed at %s:8091\n\n" % masterIpList[0]
   print "  WARNING: Additional Couchbase node may be needed for full replication"
 
   exit()

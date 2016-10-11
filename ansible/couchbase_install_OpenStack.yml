@@ -5,10 +5,10 @@
   user: cloud-user
   become: true
   tasks:
-  - name: Copy couchbase rpm to server
-    copy:
-       src: ./couchbase-server-community-4.1.0-centos7.x86_64.rpm
-       dest: /tmp/couchbase-server-community-4.1.0-centos7.x86_64.rpm
+  - name: Download couchbase rpm to server
+    get_url:
+      url: https://github.com/redhat-kejones/couchbase-heat-ansible/blob/master/software/couchbase-server-community-4.1.0-centos7.x86_64.rpm?raw=true
+      dest: /tmp/couchbase-server-community-4.1.0-centos7.x86_64.rpm
   - name: Install couchbase rpm
     yum:
        name: /tmp/couchbase-server-community-4.1.0-centos7.x86_64.rpm
