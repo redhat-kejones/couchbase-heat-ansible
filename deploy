@@ -199,8 +199,8 @@ def main(argv):
   stack_get = heatclient.stacks.get(stackName)
 
   #Get IPs for master node
-  masterFloatingIpList = get_stack_outputs(stack_get, "cb_cluster_main_floating_ip")
-  masterPrivateIpList = get_stack_outputs(stack_get, "cb_cluster_main_private_ip")
+  masterFloatingIpList = get_stack_outputs(stack_get, "cb_cluster_master_floating_ip")
+  masterPrivateIpList = get_stack_outputs(stack_get, "cb_cluster_master_private_ip")
 
   #Get IPs for data nodes
   dataNodeFloatingIpList = get_stack_outputs(stack_get, "cb_cluster_data_group_floating_ips")

@@ -57,41 +57,47 @@ resources:
   couchbase-sg:
     type: OS::Neutron::SecurityGroup
     properties:
-      name: couchbase
+      name: couchbase-master
       rules:
-        [
-        {remote_ip_prefix: 0.0.0.0/0,protocol: icmp},
-        {remote_ip_prefix: 0.0.0.0/0,protocol: tcp, port_range_min: 22, port_range_max: 22},
-        {remote_ip_prefix: 0.0.0.0/0,protocol: tcp, port_range_min: 1337, port_range_max: 1337},
-        {remote_ip_prefix: 0.0.0.0/0,protocol: tcp, port_range_min: 8091, port_range_max: 8093}
-        ]
+        - protocol: icmp
+        - protocol: tcp
+          port_range_min: 22
+          port_range_max: 22
+        - protocol: tcp
+          port_range_min: 1337
+          port_range_max: 1337
+        - protocol: tcp
+          port_range_min: 8091
+          port_range_max: 8093
+        - protocol: any
+          remote_group: couchbase-data
 
-  cb_cluster_main:
+  cb_cluster_master:
     type: OS::Nova::Server
     properties:
-      name: couchbase-main
+      name: couchbase-master
       image: { get_param: image_name }
       flavor: { get_param: flavor }
       key_name: {get_param: key_name }
-      security_groups:
-        - { get_resource: couchbase-sg }
       networks:
-        - port: { get_resource: cb_cluster_main_port }
+        - port: { get_resource: cb_cluster_master_port }
       user_data_format: RAW
       user_data: |
           #!/bin/bash -ex
-          echo "Hello from couchbase-main Updated" > /tmp/server_hello
+          echo "Hello from couchbase-master Updated" > /tmp/server_hello
 
-  cb_cluster_main_port:
+  cb_cluster_master_port:
     type: OS::Neutron::Port
     properties:
       network_id: { get_resource: couchbase-network }
+      security_groups:
+        - { get_resource: couchbase-sg }
 
-  cb_cluster_main_floating_ip:
+  cb_cluster_master_floating_ip:
     type: OS::Neutron::FloatingIP
     properties:
       floating_network_id: { get_param: public_network }
-      port_id: { get_resource: cb_cluster_main_port }
+      port_id: { get_resource: cb_cluster_master_port }
 
   cb_cluster_data_group:
     type: OS::Heat::ResourceGroup
@@ -107,12 +113,12 @@ resources:
            private_network: { get_resource: couchbase-network }
 
 outputs:
-  cb_cluster_main_floating_ip:
-    description: Floating IP address of cb_cluster_main instance
-    value: { get_attr: [cb_cluster_main_floating_ip, floating_ip_address ] }
-  cb_cluster_main_private_ip:
-    description: Private IP address of cb_cluster_main instance
-    value: { get_attr: [cb_cluster_main, first_address ] }
+  cb_cluster_master_floating_ip:
+    description: Floating IP address of cb_cluster_master instance
+    value: { get_attr: [cb_cluster_master_floating_ip, floating_ip_address ] }
+  cb_cluster_master_private_ip:
+    description: Private IP address of cb_cluster_master instance
+    value: { get_attr: [cb_cluster_master, first_address ] }
   cb_cluster_data_group_floating_ips:
     description: Floating IP addresses for all of the data nodes
     value: { get_attr: [cb_cluster_data_group, cb_cluster_data_floating_ip] }
