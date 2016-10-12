@@ -280,7 +280,7 @@ def main(argv):
   time.sleep(30)
 
   # Add Nodes
-  print "\n Adding nodes to Couchbase cluster and a data bucket"
+  print "\n Adding nodes to Couchbase cluster"
 
   variable_manager3 = VariableManager()
   loader3 = DataLoader()
@@ -306,6 +306,34 @@ def main(argv):
   pbex3 = PlaybookExecutor(playbooks=[playbook_path3], inventory=inventory3, variable_manager=variable_manager3, loader=loader3, options=options, passwords=passwords)
 
   results = pbex3.run()
+
+  if not updateStack:
+    print "\n Adding a data bucket"
+
+    variable_manager4 = VariableManager()
+    loader4 = DataLoader()
+
+    playbook_path4 = 'ansible/couchbase_add_bucket.yml'
+
+    if not os.path.exists(playbook_path4):
+      print '[INFO] The playbook does not exist'
+      sys.exit()
+
+    variable_manager4.extra_vars = {'cluster_main_ip' : masterFloatingIpList[0],
+                                'cluster_node_ips' : [couchbase_private_ips],
+                                'admin_user' : 'Administrator',
+                                'admin_password' : 'Vinson#12',
+                                'cluster_ram_quota' : '2048',
+                                'server_port' : '8091',
+                                'bucket_name' : 'kejones',
+                                'bucket_ram_quota' : '512',
+                                'num_replicas' : '2'
+                                }
+
+    inventory4 = Inventory(loader=loader4, variable_manager=variable_manager4, host_list=[masterFloatingIpList[0]])
+    pbex4 = PlaybookExecutor(playbooks=[playbook_path4], inventory=inventory4, variable_manager=variable_manager4, loader=loader4, options=options, passwords=passwords)
+
+    results = pbex4.run()
 
   elapsed_time = time.time() - start_time
   m, s = divmod(elapsed_time, 60)
