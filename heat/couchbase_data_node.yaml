@@ -18,25 +18,6 @@ parameters:
     default: m1.small
 
 resources:
-  couchbase-sg:
-    type: OS::Neutron::SecurityGroup
-    properties:
-      name: couchbase-data
-      rules:
-        - protocol: icmp
-        - protocol: tcp
-          port_range_min: 22
-          port_range_max: 22
-        - protocol: tcp
-          port_range_min: 1337
-          port_range_max: 1337
-        - protocol: tcp
-          port_range_min: 8091
-          port_range_max: 8093
-        - protocol: any
-          remote_group_id: couchbase-data
-          remote_mode: remote_group_id
-
   cb_cluster_data_instance:
     type: OS::Nova::Server
     properties:
@@ -56,7 +37,7 @@ resources:
     properties:
       network_id: { get_param: private_network }
       security_groups:
-        - { get_resource: couchbase-sg }
+        - couchbase
 
   cb_cluster_data_floating_ip:
     type: OS::Neutron::FloatingIP
