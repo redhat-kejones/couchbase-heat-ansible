@@ -70,7 +70,8 @@ resources:
           port_range_min: 8091
           port_range_max: 8093
         - protocol: any
-          remote_group: couchbase-data
+          remote_group_id: couchbase-data
+          remote_mode: remote_group_id
 
   cb_cluster_master:
     type: OS::Nova::Server
