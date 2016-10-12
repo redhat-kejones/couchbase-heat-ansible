@@ -95,7 +95,6 @@ def main(argv):
   updateStack = False
   keyName="my_key"
   publicNetwork = "external"
-  privateNetwork = "tenant"
   imageName = "rhel72"
   flavor = "m1.small"
 
@@ -106,7 +105,7 @@ def main(argv):
         argv.pop(0)
 
   try:
-    opts, args = getopt.getopt(argv, "h", ["help", "num-data-nodes=", "update", "key-name=", "public-network=", "private-network=", "image-name=", "flavor="])
+    opts, args = getopt.getopt(argv, "h", ["help", "num-data-nodes=", "update", "key-name=", "public-network=", "image-name=", "flavor="])
   except getopt.GetoptError:
     usage()
     sys.exit(2)
@@ -123,8 +122,6 @@ def main(argv):
       keyName = arg
     elif opt == "--public-network":
       publicNetwork = arg
-    elif opt == "--private-network":
-      privateNetwork = arg
     elif opt == "--image-name":
       imageName = arg
     elif opt == "--flavor":
@@ -137,8 +134,6 @@ def main(argv):
 
   start_time = time.time()
 
-  print "Creating Couchbase stack named %s" % stackName
-
   template_file = 'heat/couchbase_community.yaml'
   template = open(template_file, 'r')
   read_template = template.read()
@@ -147,7 +142,33 @@ def main(argv):
   env = open(env_file, 'r')
   read_env = env.read()
 
-  stack = heatclient.stacks.create(
+  if updateStack:
+    print "Updating Couchbase stack named %s" % stackName
+    stack = heatclient.stacks.update(
+                                      stackName,
+                                      template=read_template,
+                                      environment=read_env,
+                                      parameters={
+                                        'flavor':flavor,
+                                        'image_name':imageName,
+                                        'key_name':keyName,
+                                        'public_network':publicNetwork,
+                                        'num_data_instances':numDataNodes
+                                      },
+                                      poll=5
+                                    )
+
+    while True:
+      stack_get = heatclient.stacks.get(stackName)
+      
+      if stack_get.stack_status == "UPDATE_IN_PROGRESS":
+        print "Update stack in progress ..."
+        time.sleep(5)
+      elif stack_get.stack_status == "UPDATE_COMPLETE":
+        break
+  else:
+    print "Creating Couchbase stack named %s" % stackName
+    stack = heatclient.stacks.create(
                                      stack_name=stackName,
                                      template=read_template,
                                      environment=read_env,
@@ -156,46 +177,47 @@ def main(argv):
                                        'image_name':imageName,
                                        'key_name':keyName,
                                        'public_network':publicNetwork,
-                                       'private_network':privateNetwork,
                                        'num_data_instances':numDataNodes
                                      },
                                      poll=5
                                    )
 
-  uid = stack['stack']['id']
-  stack = heatclient.stacks.get(stack_id=uid).to_dict()
-
-  while stack['stack_status'] == 'CREATE_IN_PROGRESS':
+    uid = stack['stack']['id']
     stack = heatclient.stacks.get(stack_id=uid).to_dict()
-    print "Create stack in progress ..."
-    time.sleep(5)
-  if stack['stack_status'] == 'CREATE_COMPLETE': 
-    for it in stack['outputs']: 
-      print "{key}: {val}".format(key=it['output_key'], val=it['output_value']) 
-    print "Stack succesfully created." 
-  else: 
-    print "Stack create failed." 
 
-  stacklist = heatclient.stacks.list()
+    while stack['stack_status'] == 'CREATE_IN_PROGRESS':
+      stack = heatclient.stacks.get(stack_id=uid).to_dict()
+      print "Create stack in progress ..."
+      time.sleep(5)
+    if stack['stack_status'] == 'CREATE_COMPLETE': 
+      for it in stack['outputs']: 
+        print "{key}: {val}".format(key=it['output_key'], val=it['output_value']) 
+      print "Stack succesfully created." 
+    else: 
+      print "Stack create failed." 
 
-  print "Stack get for %s\n\n" % stackName
   stack_get = heatclient.stacks.get(stackName)
 
-  masterIpList = get_stack_outputs(stack_get, "cb_cluster_main_floating_ip")
+  #Get IPs for master node
+  masterFloatingIpList = get_stack_outputs(stack_get, "cb_cluster_main_floating_ip")
+  masterPrivateIpList = get_stack_outputs(stack_get, "cb_cluster_main_private_ip")
+
+  #Get IPs for data nodes
   dataNodeFloatingIpList = get_stack_outputs(stack_get, "cb_cluster_data_group_floating_ips")
   dataNodePrivateIpList = get_stack_outputs(stack_get, "cb_cluster_data_group_private_ips")
 
   #Going to combine these lists for now. Will add ansible through proxy later
   #and will switch to using private IPs for data nodes
-  couchbase_floating_ips = masterIpList
-  for x in dataNodeFloatingIpList:
-    couchbase_floating_ips.append(x[0])
+  couchbase_floating_ips = masterFloatingIpList
+  for x in dataNodeFloatingIpList[0]:
+    couchbase_floating_ips.append(x)
 
-  couchbase_private_ips = []
-  for x in dataNodePrivateIpList:
-    couchbase_private_ips.append(x[0])
+  couchbase_private_ips = masterPrivateIpList
+  for x in dataNodePrivateIpList[0]:
+    couchbase_private_ips.append(x)
 
   print couchbase_floating_ips
+  print couchbase_private_ips
  
   print "Waiting for instances to become available - checking for password-less ssh access"
 
@@ -226,28 +248,29 @@ def main(argv):
 
   results = pbex.run()
 
-  print "\n Waiting before Couchbase cluster init"
-  time.sleep(30)
+  if not updateStack:
+    print "\n Waiting before Couchbase cluster init"
+    time.sleep(30)
 
-  variable_manager2 = VariableManager()
-  loader2 = DataLoader()
+    variable_manager2 = VariableManager()
+    loader2 = DataLoader()
 
-  playbook_path2 = 'ansible/couchbase_init_cluster_OpenStack.yml'
+    playbook_path2 = 'ansible/couchbase_init_cluster_OpenStack.yml'
 
-  if not os.path.exists(playbook_path2):
-    print '[INFO] The playbook does not exist'
-    sys.exit()
+    if not os.path.exists(playbook_path2):
+      print '[INFO] The playbook does not exist'
+      sys.exit()
 
-  variable_manager2.extra_vars = {'cluster_main_ip' : masterIpList[0],
+    variable_manager2.extra_vars = {'cluster_main_ip' : masterFloatingIpList[0],
                                 'admin_user' : 'Administrator',
                                 'admin_password' : 'Vinson#12',
                                 'cluster_ram_quota' : '2048' 
                                 }
 
-  inventory2 = Inventory(loader=loader2, variable_manager=variable_manager2, host_list=[masterIpList[0]])
-  pbex2 = PlaybookExecutor(playbooks=[playbook_path2], inventory=inventory2, variable_manager=variable_manager2, loader=loader2, options=options, passwords=passwords)
+    inventory2 = Inventory(loader=loader2, variable_manager=variable_manager2, host_list=[masterFloatingIpList[0]])
+    pbex2 = PlaybookExecutor(playbooks=[playbook_path2], inventory=inventory2, variable_manager=variable_manager2, loader=loader2, options=options, passwords=passwords)
 
-  results = pbex2.run()
+    results = pbex2.run()
 
   # Add Nodes
   print "\n Adding nodes to Couchbase cluster and a data bucket"
@@ -261,8 +284,8 @@ def main(argv):
     print '[INFO] The playbook does not exist'
     sys.exit()
 
-  variable_manager3.extra_vars = {'cluster_main_ip' : masterIpList[0],
-                                'cluster_node_ips' : [couchbase_private_ips[1]],
+  variable_manager3.extra_vars = {'cluster_main_ip' : masterFloatingIpList[0],
+                                'cluster_node_ips' : [couchbase_private_ips],
                                 'admin_user' : 'Administrator',
                                 'admin_password' : 'Vinson#12',
                                 'cluster_ram_quota' : '2048',
@@ -272,7 +295,7 @@ def main(argv):
                                 'num_replicas' : '2'
                                 }
 
-  inventory3 = Inventory(loader=loader3, variable_manager=variable_manager3, host_list=[masterIpList[0]])
+  inventory3 = Inventory(loader=loader3, variable_manager=variable_manager3, host_list=[masterFloatingIpList[0]])
   pbex3 = PlaybookExecutor(playbooks=[playbook_path3], inventory=inventory3, variable_manager=variable_manager3, loader=loader3, options=options, passwords=passwords)
 
   results = pbex3.run()
@@ -283,8 +306,7 @@ def main(argv):
 
   print "Message from Couchbase Configuration ..."
   print "  Couchbase Stack completed in: %d:%02d:%02d" % (h, m, s)
-  print "  Couchbase console can be accessed at %s:8091\n\n" % masterIpList[0]
-  print "  WARNING: Additional Couchbase node may be needed for full replication"
+  print "  Couchbase console can be accessed at %s:8091\n\n" % masterFloatingIpList[0]
 
   exit()
 

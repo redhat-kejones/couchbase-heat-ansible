@@ -1,1 +1,3 @@
-/opt/couchbase/bin/couchbase-cli server-add -c {{ cluster_main_ip }}:{{ server_port }} -u {{ admin_user }} -p {{ admin_password }} --server-add={{ cluster_node_ips[0] }} --server-add-username={{ admin_user }} --server-add-password={{ admin_password }} --services=data
+{% for node in cluster_node_ips[0] %}
+	/opt/couchbase/bin/couchbase-cli server-add -c {{ cluster_main_ip }}:{{ server_port }} -u {{ admin_user }} -p {{ admin_password }} --server-add={{ node }} --server-add-username={{ admin_user }} --server-add-password={{ admin_password }} --services=data
+{% endfor %}

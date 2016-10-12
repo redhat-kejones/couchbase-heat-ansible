@@ -6,21 +6,16 @@
   become: true
   tasks:
   - name: Create shell script for configuring main node
-    action: template src=couchbase-add-node.j2 dest=/tmp/addnodes.sh mode=750
+    action: template src=templates/couchbase-add-node.j2 dest=/tmp/addnodes.sh mode=750
 
-  # Wait for main node to init
-#  - pause: seconds=30
   - name: Launch config script
     action: shell /tmp/addnodes.sh
-#
-  # Wait for added node to configure
-#  - pause: seconds=30
-#
+  
   - name: Rebalance the cluster
     shell: /opt/couchbase/bin/couchbase-cli rebalance -c {{ cluster_main_ip }}:8091 -u {{ admin_user }} -p {{ admin_password }}
 
   - name: create bucket ${bucket_name} with ${num_replicas} replicas
     shell: /opt/couchbase/bin/couchbase-cli bucket-create -c {{ cluster_main_ip }}:8091 --bucket={{ bucket_name }} --bucket-type=couchbase --bucket-port=11211 --bucket-ramsize={{ bucket_ram_quota }} --bucket-replica={{ num_replicas }} -u {{ admin_user }} -p {{ admin_password }}
     
-#  - name: Add Beer Sample to ${bucket_name} Bucket
-#    shell: /opt/couchbase/bin/cbdocloader -n localhost:8091 -u {{ admin_user }} -p {{ admin_password }} -b kejones -s 100 /opt/couchbase/samples/beer-sample.zip
+  - name: Add Beer Sample to ${bucket_name} Bucket
+    shell: /opt/couchbase/bin/cbdocloader -n localhost:8091 -u {{ admin_user }} -p {{ admin_password }} -b kejones -s 100 /opt/couchbase/samples/beer-sample.zip
