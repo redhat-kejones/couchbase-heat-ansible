@@ -12,9 +12,9 @@
 #   -update		Boolean 	Send stack update request
 #
 # Examples:
-#   ./deploy couchbase					Deploys couchbase cluster
-#   ./deploy couchbase --num-data-nodes=4			Deploys couchbase cluster with 4 data nodes
-#   ./deploy couchbase --num-data-nodes=5 --update	Runs stack update to add a data node
+#   ./deploy couchbase				Deploys couchbase cluster
+#   ./deploy couchbase --num-data-nodes=4	Deploys couchbase cluster with 4 data nodes
+#   ./deploy couchbase --num-data-nodes=5  	Runs stack update to add a data node
 #
 
 import sys
@@ -105,7 +105,7 @@ def main(argv):
         argv.pop(0)
 
   try:
-    opts, args = getopt.getopt(argv, "h", ["help", "num-data-nodes=", "update", "key-name=", "public-network=", "image-name=", "flavor="])
+    opts, args = getopt.getopt(argv, "h", ["help", "num-data-nodes=", "key-name=", "public-network=", "image-name=", "flavor="])
   except getopt.GetoptError:
     usage()
     sys.exit(2)
@@ -114,8 +114,6 @@ def main(argv):
     if opt in ("-h", "--help"):
       usage()
       sys.exit()
-    elif opt == '--update':
-      updateStack = True
     elif opt == "--num-data-nodes":
       numDataNodes = arg
     elif opt == "--key-name":
@@ -142,6 +140,12 @@ def main(argv):
   env = open(env_file, 'r')
   read_env = env.read()
 
+  stacks = heatclient.stacks.list()
+  for stack in stacks:
+    if stack.stack_name == stackName:
+      updateStack = True
+      break
+ 
   if updateStack:
     print "Updating Couchbase stack named %s" % stackName
     stack = heatclient.stacks.update(
@@ -212,7 +216,7 @@ def main(argv):
   for x in dataNodeFloatingIpList[0]:
     couchbase_floating_ips.append(x)
 
-  couchbase_private_ips = masterPrivateIpList
+  couchbase_private_ips = []
   for x in dataNodePrivateIpList[0]:
     couchbase_private_ips.append(x)
 
@@ -271,6 +275,9 @@ def main(argv):
     pbex2 = PlaybookExecutor(playbooks=[playbook_path2], inventory=inventory2, variable_manager=variable_manager2, loader=loader2, options=options, passwords=passwords)
 
     results = pbex2.run()
+
+  print "\n Waiting before adding nodes to cluster"
+  time.sleep(30)
 
   # Add Nodes
   print "\n Adding nodes to Couchbase cluster and a data bucket"
