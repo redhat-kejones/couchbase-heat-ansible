@@ -15,7 +15,7 @@ parameters:
     default: rhel72
   flavor:
     type: string
-    default: m1.small
+    default: m1.medium
   num_data_instances:
     type: number
     description: Number of Couchbase data node instances to create

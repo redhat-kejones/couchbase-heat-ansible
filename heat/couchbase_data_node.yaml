@@ -15,7 +15,7 @@ parameters:
     default: rhel72
   flavor:
     type: string
-    default: m1.small
+    default: m1.medium
 
 resources:
   cb_cluster_data_instance:

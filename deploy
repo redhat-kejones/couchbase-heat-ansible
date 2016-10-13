@@ -228,6 +228,9 @@ def main(argv):
   for x in couchbase_floating_ips:
       check_server_available(x, 'cloud-user', '/home/kejones/kdj.pem', 'hostname')
 
+  #Need to give cloud-init some time to complete
+  time.sleep(30)
+
   # initialize needed objects
   variable_manager = VariableManager()
   loader = DataLoader()
